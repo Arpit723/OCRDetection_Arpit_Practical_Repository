@@ -147,31 +147,83 @@ final class PolynomialParserServiceImpl: PolynomialParserService {
 
     private func processExpression(_ expression: String) throws -> PolynomialMathResult {
         do {
+            print("    🔢 [DEBUG] Parser: Normalizing expression '\(expression)'")
             let normalized = normalizeExpression(expression)
+            if expression != normalized {
+                print("    ✅ [DEBUG] Parser: Normalized to '\(normalized)' (implicit multiplication added)")
+            } else {
+                print("    ✅ [DEBUG] Parser: Normalized to '\(normalized)'")
+            }
+
+            print("    🔢 [DEBUG] Parser: Tokenizing...")
             let tokens = try tokenize(normalized)
+            print("    ✅ [DEBUG] Parser: Got \(tokens.count) tokens")
+
+            print("    🔢 [DEBUG] Parser: Building AST...")
             let ast = try buildAST(from: tokens)
+            print("    ✅ [DEBUG] Parser: AST built: \(ast.description)")
 
             // Simplify
+            print("    🔢 [DEBUG] Parser: Simplifying...")
             let simplifiedAST = simplifyNode(ast)
             let simplified = formatExpression(simplifiedAST)
+            print("    ✅ [DEBUG] Parser: Simplified to '\(simplified)'")
 
             // Derivative
+            print("    🔢 [DEBUG] Parser: Computing derivative...")
             let derivAST = calculateDerivative(ast, variable: "x")
             let derivative = formatExpression(derivAST)
+            print("    ✅ [DEBUG] Parser: Derivative is '\(derivative)'")
 
             // Evaluate at x=1 and x=2
-            let valueAt1 = try? evaluateNode(ast, variables: ["x": 1.0])
-            let valueAt2 = try? evaluateNode(ast, variables: ["x": 2.0])
+            print("    🔢 [DEBUG] Parser: Evaluating at x=1...")
+            var valueAt1: Double?
+            var valueAt2: Double?
+            var evalError: Error?
 
-            return PolynomialMathResult(
+            do {
+                valueAt1 = try evaluateNode(ast, variables: ["x": 1.0])
+                print("    ✅ [DEBUG] Parser: f(1) = \(valueAt1?.description ?? "nil")")
+            } catch {
+                print("    ⚠️ [DEBUG] Parser: f(1) evaluation failed: \(error.localizedDescription)")
+                evalError = error
+                valueAt1 = nil
+            }
+
+            print("    🔢 [DEBUG] Parser: Evaluating at x=2...")
+            do {
+                valueAt2 = try evaluateNode(ast, variables: ["x": 2.0])
+                print("    ✅ [DEBUG] Parser: f(2) = \(valueAt2?.description ?? "nil")")
+            } catch {
+                print("    ⚠️ [DEBUG] Parser: f(2) evaluation failed: \(error.localizedDescription)")
+                evalError = error
+                valueAt2 = nil
+            }
+
+            let result = PolynomialMathResult(
                 original: expression,
                 simplified: simplified,
                 derivative: derivative,
                 valueAt1: valueAt1,
                 valueAt2: valueAt2
             )
+
+            // If evaluation failed, attach the error but still return partial result
+            if let evalError = evalError {
+                return PolynomialMathResult(
+                    original: expression,
+                    simplified: simplified,
+                    derivative: derivative,
+                    valueAt1: valueAt1,
+                    valueAt2: valueAt2,
+                    error: evalError as? PolynomialMathResult.MathError ?? .unknown(evalError.localizedDescription)
+                )
+            }
+
+            return result
         } catch {
             // Return partial result with error
+            print("    ❌ [DEBUG] Parser: Process failed with error: \(error.localizedDescription)")
             return PolynomialMathResult(
                 original: expression,
                 error: error as? PolynomialMathResult.MathError ?? .unknown(error.localizedDescription)
@@ -192,10 +244,98 @@ final class PolynomialParserServiceImpl: PolynomialParserService {
         // Replace superscript numbers with ^ notation
         normalized = replaceSuperscripts(normalized)
 
+        // Add implicit multiplication (e.g., "2x" → "2*x", "x2" → "x*2")
+        normalized = insertImplicitMultiplication(normalized)
+
         // Remove whitespace
         normalized = normalized.replacingOccurrences(of: " ", with: "")
 
         return normalized
+    }
+
+    /// Insert explicit multiplication operators for implicit multiplication
+    /// Handles patterns like: 2x, x2, 2(x), (x)y, etc.
+    private func insertImplicitMultiplication(_ text: String) -> String {
+        var result = ""
+        var i = 0
+
+        while i < text.count {
+            let index = text.index(text.startIndex, offsetBy: i)
+            let char = text[index]
+
+            // Add current character
+            result.append(char)
+
+            // Check if we need to insert "*" after this character
+            if i + 1 < text.count {
+                let nextIndex = text.index(after: index)
+                let nextChar = text[nextIndex]
+
+                // Implicit multiplication patterns:
+                // 1. Digit followed by letter (2x → 2*x)
+                if char.isNumber && nextChar.isLetter {
+                    result.append("*")
+                }
+                // 2. Digit followed by '(' (2( → 2*()
+                else if char.isNumber && nextChar == "(" {
+                    result.append("*")
+                }
+                // 3. Letter followed by digit - could be power notation (x2 → x^2) or multiplication (x12 → x*12)
+                //    Single digit after letter = power notation (x2 means x²)
+                //    Multiple digits after letter = multiplication (x12 means x*12)
+                else if char.isLetter && nextChar.isNumber {
+                    let digitCount = countConsecutiveDigits(in: text, from: nextIndex)
+                    if digitCount == 1 {
+                        // Single digit = power notation (x2 → x^2)
+                        result.append("^")
+                    } else {
+                        // Multiple digits = multiplication (x12 → x*12)
+                        result.append("*")
+                    }
+                }
+                // 4. ')' followed by digit ()2 → )*2)
+                else if char == ")" && nextChar.isNumber {
+                    result.append("*")
+                }
+                // 5. ')' followed by '(' ()( → )*()
+                else if char == ")" && nextChar == "(" {
+                    result.append("*")
+                }
+                // 6. Letter followed by '(' (x( → x*()
+                else if char.isLetter && nextChar == "(" {
+                    result.append("*")
+                }
+                // 7. ')' followed by letter ()x → )*x)
+                else if char == ")" && nextChar.isLetter {
+                    result.append("*")
+                }
+                // 8. Letter followed by letter (xy → x*y) - for implicit multiplication of variables
+                else if char.isLetter && nextChar.isLetter {
+                    result.append("*")
+                }
+            }
+
+            i += 1
+        }
+
+        return result
+    }
+
+    /// Count consecutive digits starting from the given index
+    /// Used to distinguish between power notation (x2 → single digit) and multiplication (x12 → multiple digits)
+    private func countConsecutiveDigits(in text: String, from index: String.Index) -> Int {
+        var count = 0
+        var i = index
+        while i < text.endIndex {
+            let char = text[i]
+            if char.isNumber {
+                count += 1
+                i = text.index(after: i)
+            } else {
+                break
+            }
+        }
+        return count
     }
 
     private func replaceSuperscripts(_ text: String) -> String {
@@ -247,11 +387,44 @@ final class PolynomialParserServiceImpl: PolynomialParserService {
 
             switch char {
             case "0"..."9":
-                // Parse number
+                // Check for negative number at start or after operator/paren
+                if i > expression.startIndex {
+                    let prevIndex = expression.index(before: i)
+                    let prevChar = expression[prevIndex]
+                    if prevChar == "-" && shouldTreatAsNegativeNumber(tokens: tokens) {
+                        // Remove the subtract operator we might have added
+                        if case .mathOperator(.subtract) = tokens.last {
+                            tokens.removeLast()
+                        }
+                        // Parse as negative number
+                        let number = parseNumber(expression, from: &i)
+                        tokens.append(.number(-number))
+                        break
+                    }
+                }
+
+                // Parse positive number
                 let number = parseNumber(expression, from: &i)
                 tokens.append(.number(number))
 
             case "x", "y", "z", "n":
+                // Check for negative variable (e.g., -x at start)
+                if i > expression.startIndex {
+                    let prevIndex = expression.index(before: i)
+                    let prevChar = expression[prevIndex]
+                    if prevChar == "-" && shouldTreatAsNegativeNumber(tokens: tokens) {
+                        // Remove the subtract operator
+                        if case .mathOperator(.subtract) = tokens.last {
+                            tokens.removeLast()
+                        }
+                        // Add unary minus with variable
+                        tokens.append(.mathOperator(.subtract))
+                        tokens.append(.variable(String(char)))
+                        i = expression.index(after: i)
+                        break
+                    }
+                }
+
                 // Variable
                 tokens.append(.variable(String(char)))
                 i = expression.index(after: i)
@@ -261,6 +434,20 @@ final class PolynomialParserServiceImpl: PolynomialParserService {
                 i = expression.index(after: i)
 
             case "-":
+                // Check if this could be the start of a negative number
+                // Look ahead to see if next char is digit or variable
+                let nextIndex = expression.index(after: i)
+                if nextIndex < expression.endIndex {
+                    let nextChar = expression[nextIndex]
+                    if (nextChar.isNumber || nextChar == "." || "xyn".contains(nextChar)) && shouldTreatAsNegativeNumber(tokens: tokens) {
+                        // This might be a negative number, add subtract for now
+                        // Will be converted to negative number in digit/variable case above
+                        tokens.append(.mathOperator(.subtract))
+                        i = nextIndex
+                        break
+                    }
+                }
+                // Regular subtraction
                 tokens.append(.mathOperator(.subtract))
                 i = expression.index(after: i)
 
@@ -296,6 +483,26 @@ final class PolynomialParserServiceImpl: PolynomialParserService {
 
         tokens.append(.eof)
         return tokens
+    }
+
+    /// Check if a minus sign should be treated as part of a negative number
+    private func shouldTreatAsNegativeNumber(tokens: [Token]) -> Bool {
+        // Negative at start of expression
+        if tokens.isEmpty {
+            return true
+        }
+
+        // Negative after opening parenthesis
+        if case .leftParen = tokens.last {
+            return true
+        }
+
+        // Negative after another operator
+        if case .mathOperator = tokens.last {
+            return true
+        }
+
+        return false
     }
 
     private func parseNumber(_ expression: String, from index: inout String.Index) -> Double {

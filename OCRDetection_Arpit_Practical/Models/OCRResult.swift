@@ -32,11 +32,15 @@ struct OCRResult: Identifiable, Equatable {
 
     /// Initialize from Vision framework's VNRecognizedTextObservation
     init?(from observation: VNRecognizedTextObservation, topLevelCandidateIndex: Int = 0) {
-        guard topLevelCandidateIndex < observation.topCandidates(1).count else {
+        // Get candidates once to avoid redundant calls
+        let candidates = observation.topCandidates(1)
+
+        // Guard: Check if the requested index is valid
+        guard topLevelCandidateIndex < candidates.count else {
             return nil
         }
 
-        let candidate = observation.topCandidates(1)[topLevelCandidateIndex]
+        let candidate = candidates[topLevelCandidateIndex]
         let text = candidate.string
         let confidence = candidate.confidence
 

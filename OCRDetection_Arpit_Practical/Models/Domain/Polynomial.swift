@@ -79,6 +79,10 @@ struct Polynomial: Identifiable, Equatable {
         valueAt2.map { String(format: "%.2f", $0) } ?? "N/A"
     }
 
+    var simplifiedDisplay: String {
+        simplifiedExpression ?? originalExpression
+    }
+
     // MARK: - Validation
 
     /// Validate polynomial has minimum required data

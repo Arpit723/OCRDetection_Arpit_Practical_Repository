@@ -32,38 +32,50 @@ final class OCRServiceImpl: OCRService {
     }
 
     func processImage(_ image: UIImage, recognitionLevel: OCRRecognitionLevel) async throws -> [OCRResult] {
+        print("🔍 [DEBUG] OCRService.processImage starting")
+        print("  Image size: \(image.size.width) x \(image.size.height)")
+
         // Guard: Convert UIImage to CIImage
         guard let cgImage = image.cgImage else {
+            print("❌ [DEBUG] Failed to get CGImage from UIImage")
             throw OCRError.imageProcessingFailed
         }
 
         let ciImage = CIImage(cgImage: cgImage)
+        print("✅ [DEBUG] Converted to CIImage successfully")
 
         return try await withCheckedThrowingContinuation { continuation in
             // Create and configure the request
             let request = VNRecognizeTextRequest { request, error in
                 if let error = error {
+                    print("❌ [DEBUG] Vision request failed: \(error.localizedDescription)")
                     continuation.resume(throwing: OCRError.visionError(error))
                     return
                 }
 
                 guard let observations = request.results as? [VNRecognizedTextObservation], !observations.isEmpty else {
+                    print("⚠️ [DEBUG] Vision request completed but no text observations found")
                     continuation.resume(throwing: OCRError.noTextFound)
                     return
                 }
+
+                print("✅ [DEBUG] Vision found \(observations.count) text observations")
 
                 // Convert VNRecognizedTextObservation to OCRResult
                 let ocrResults = self.convertToOCRResults(from: observations)
 
                 if ocrResults.isEmpty {
+                    print("⚠️ [DEBUG] No OCR results passed confidence threshold (>= \(self.minimumConfidence))")
                     continuation.resume(throwing: OCRError.noTextFound)
                 } else {
+                    print("✅ [DEBUG] Returning \(ocrResults.count) OCR results above threshold")
                     continuation.resume(returning: ocrResults)
                 }
             }
 
             // Configure recognition level
             request.recognitionLevel = recognitionLevel.visionLevel
+            print("  Recognition level: \(recognitionLevel)")
 
             // Enable multiple languages if needed
             // request.recognitionLanguages = ["en-US"]
@@ -74,10 +86,12 @@ final class OCRServiceImpl: OCRService {
             // Perform request on background queue
             let handler = VNImageRequestHandler(ciImage: ciImage, options: [:])
 
+            print("🔄 [DEBUG] Starting Vision request on background queue...")
             DispatchQueue.global(qos: .userInitiated).async {
                 do {
                     try handler.perform([request])
                 } catch {
+                    print("❌ [DEBUG] Handler.perform failed: \(error.localizedDescription)")
                     continuation.resume(throwing: OCRError.visionError(error))
                 }
             }
@@ -93,25 +107,39 @@ final class OCRServiceImpl: OCRService {
 
     private func convertToOCRResults(from observations: [VNRecognizedTextObservation]) -> [OCRResult] {
         var results: [OCRResult] = []
+        var skippedCount = 0
+        var failedCount = 0
 
-        for observation in observations {
+        print("  🔄 [DEBUG] Converting \(observations.count) observations to OCRResult...")
+
+        for (index, observation) in observations.enumerated() {
             // Get the top candidate (highest confidence)
             guard let candidate = observation.topCandidates(1).first else {
+                skippedCount += 1
                 continue
             }
 
             let confidence = candidate.confidence
+            let confidencePercent = String(format: "%.1f%%", confidence * 100)
 
             // Filter by minimum confidence
             guard confidence >= minimumConfidence else {
+                print("    [\(index)] Skipping '\(candidate.string.prefix(30))' (confidence: \(confidencePercent) < \(Int(minimumConfidence * 100))%)")
+                skippedCount += 1
                 continue
             }
 
             // Create OCRResult
             if let result = OCRResult(from: observation) {
                 results.append(result)
+                print("    [\(index)] ✅ '\(result.text.prefix(30))' (confidence: \(confidencePercent))")
+            } else {
+                print("    [\(index)] ❌ Failed to create OCRResult from observation")
+                failedCount += 1
             }
         }
+
+        print("  📊 [DEBUG] Conversion summary: \(results.count) passed, \(skippedCount) skipped, \(failedCount) failed")
 
         // Sort by y-position (top to bottom) for natural reading order
         // Note: Vision uses bottom-left origin, so we invert y

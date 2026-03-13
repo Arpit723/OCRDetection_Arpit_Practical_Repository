@@ -19,36 +19,32 @@ extension PolynomialEntity {
     @NSManaged public var originalExpression: String
     @NSManaged public var simplifiedExpression: String?
     @NSManaged public var derivative: String?
-    @NSManaged public var valueAt1: Double
-    @NSManaged public var valueAt2: Double
+    @NSManaged public var valueAt1: NSDecimalNumber?
+    @NSManaged public var valueAt2: NSDecimalNumber?
     @NSManaged public var imagePath: String?
     @NSManaged public var createdAt: Date
-    @NSManaged private var primitiveValueAt1: NSNumber?
-    @NSManaged private var primitiveValueAt2: NSNumber?
-
 }
 
 // MARK: - Computed Properties for Optional Handling
 extension PolynomialEntity {
 
-    // Optional access to valueAt1 - returns nil if explicitly set as nil
+    /// Optional access to valueAt1 - returns nil if explicitly set as nil
     var valueAt1Optional: Double? {
         get {
-            // Check if the primitive value is explicitly nil
-            return primitiveValueAt1?.doubleValue
+            return valueAt1?.doubleValue
         }
         set {
-            primitiveValueAt1 = newValue.map { NSNumber(value: $0) }
+            valueAt1 = newValue.map { NSDecimalNumber(value: $0) }
         }
     }
 
-    // Optional access to valueAt2 - returns nil if explicitly set as nil
+    /// Optional access to valueAt2 - returns nil if explicitly set as nil
     var valueAt2Optional: Double? {
         get {
-            return primitiveValueAt2?.doubleValue
+            return valueAt2?.doubleValue
         }
         set {
-            primitiveValueAt2 = newValue.map { NSNumber(value: $0) }
+            valueAt2 = newValue.map { NSDecimalNumber(value: $0) }
         }
     }
 
@@ -67,14 +63,14 @@ extension PolynomialEntity {
         return imagePath != nil && !imagePath!.isEmpty
     }
 
-    /// Check if valueAt1 has an explicitly set value
+    /// Check if valueAt1 has a value
     var hasValueAt1: Bool {
-        return primitiveValueAt1 != nil
+        return valueAt1 != nil
     }
 
-    /// Check if valueAt2 has an explicitly set value
+    /// Check if valueAt2 has a value
     var hasValueAt2: Bool {
-        return primitiveValueAt2 != nil
+        return valueAt2 != nil
     }
 }
 

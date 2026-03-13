@@ -26,13 +26,21 @@ final class PolynomialRepositoryImpl: PolynomialRepository {
     // MARK: - PolynomialRepository
 
     func fetchAll() async throws -> [Polynomial] {
+        print("💾 [DEBUG] Repository: fetchAll called")
         let context = persistentContainer.viewContext
 
+        print("  📊 [DEBUG] Repository: Creating fetch request for PolynomialEntity")
         let request = NSFetchRequest<PolynomialEntity>(entityName: "PolynomialEntity")
         request.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: false)]
 
+        print("  🔍 [DEBUG] Repository: Executing fetch on main context (registered objects: \(context.registeredObjects.count))")
         let entities = try context.fetch(request)
-        return entities.map { toDomain($0) }
+        print("  ✅ [DEBUG] Repository: Fetched \(entities.count) entities from Core Data")
+
+        let domainModels = entities.map { toDomain($0) }
+        print("  ✅ [DEBUG] Repository: Converted to \(domainModels.count) domain models")
+
+        return domainModels
     }
 
     func fetchById(_ id: UUID) async throws -> Polynomial? {
@@ -47,14 +55,17 @@ final class PolynomialRepositoryImpl: PolynomialRepository {
     }
 
     func save(_ polynomial: Polynomial) async throws {
+        print("💾 [DEBUG] Repository: save called for polynomial '\(polynomial.originalExpression)'")
         try await withCheckedThrowingContinuation { continuation in
             persistentContainer.performBackgroundTask { backgroundContext in
                 do {
+                    print("  🔧 [DEBUG] Repository: Setting up background context")
                     // Set merge policy to handle conflicts
                     backgroundContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
                     backgroundContext.undoManager = nil
 
                     // Check if entity already exists
+                    print("  🔍 [DEBUG] Repository: Checking for existing entity with id: \(polynomial.id)")
                     let request = NSFetchRequest<PolynomialEntity>(entityName: "PolynomialEntity")
                     request.predicate = NSPredicate(format: "id == %@", polynomial.id as CVarArg)
                     request.fetchLimit = 1
@@ -62,7 +73,14 @@ final class PolynomialRepositoryImpl: PolynomialRepository {
                     let existingEntities = try? backgroundContext.fetch(request)
                     let entity = existingEntities?.first ?? PolynomialEntity(context: backgroundContext)
 
+                    if existingEntities?.first != nil {
+                        print("  🔄 [DEBUG] Repository: Updating existing entity")
+                    } else {
+                        print("  ➕ [DEBUG] Repository: Creating new entity")
+                    }
+
                     // Set values
+                    print("  📝 [DEBUG] Repository: Setting entity properties")
                     entity.id = polynomial.id
                     entity.originalExpression = polynomial.originalExpression
                     entity.simplifiedExpression = polynomial.simplifiedExpression
@@ -72,9 +90,23 @@ final class PolynomialRepositoryImpl: PolynomialRepository {
                     entity.imagePath = polynomial.imagePath
                     entity.createdAt = polynomial.createdAt
 
+                    print("  💾 [DEBUG] Repository: Saving background context...")
                     try backgroundContext.save()
+                    print("  ✅ [DEBUG] Repository: Background context saved successfully")
+
+                    // Resume continuation IMMEDIATELY after save
+                    // Don't dispatch to main queue - that causes continuation leak
                     continuation.resume()
+
+                    // Verify the save was merged to main context (async, non-blocking)
+                    DispatchQueue.main.async {
+                        let mainContext = self.persistentContainer.viewContext
+                        print("  🔍 [DEBUG] Repository: Main context now has \(mainContext.registeredObjects.count) registered objects")
+                        // Refresh main context to ensure we see the changes
+                        mainContext.refreshAllObjects()
+                    }
                 } catch {
+                    print("  ❌ [DEBUG] Repository: Save failed with error: \(error.localizedDescription)")
                     continuation.resume(throwing: error)
                 }
             }

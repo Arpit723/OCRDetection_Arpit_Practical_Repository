@@ -30,10 +30,42 @@ final class PolynomialFilterService {
     /// - Parameter ocrResults: Array of OCRResult from OCR service
     /// - Returns: Array of strings that appear to be polynomial expressions
     func filterPolynomials(from ocrResults: [OCRResult]) -> [String] {
-        return ocrResults
-            .filter { isPotentialPolynomial($0) }
+        print("🔍 [DEBUG] Filter: Filtering \(ocrResults.count) OCR results")
+
+        var passedCount = 0
+        var failedCount = 0
+
+        let result = ocrResults
+            .filter { result in
+                let passes = isPotentialPolynomial(result)
+                if passes {
+                    passedCount += 1
+                } else {
+                    failedCount += 1
+                    // Log why it failed (basic logging)
+                    if !result.hasValidLength() {
+                        print("    ❌ Filter out: '\(result.text.prefix(30))' - invalid length")
+                    } else if !result.isLikelyMathematical() {
+                        print("    ❌ Filter out: '\(result.text.prefix(30))' - not mathematical")
+                    } else if result.isPureNumber() {
+                        print("    ❌ Filter out: '\(result.text.prefix(30))' - pure number")
+                    } else if result.isFalsePositive() {
+                        print("    ❌ Filter out: '\(result.text.prefix(30))' - false positive (date/email/phone)")
+                    } else if !hasMathematicalStructure(result.text) {
+                        print("    ❌ Filter out: '\(result.text.prefix(30))' - no math structure")
+                    } else {
+                        print("    ❌ Filter out: '\(result.text.prefix(30))' - unknown reason")
+                    }
+                }
+                return passes
+            }
             .map { $0.text }
             .uniqued()
+
+        print("  ✅ [DEBUG] Filter: \(passedCount) passed, \(failedCount) filtered out")
+        print("  📊 [DEBUG] Filter: Returning \(result.count) unique polynomial expressions")
+
+        return result
     }
 
     /// Filter OCR results with custom thresholds.

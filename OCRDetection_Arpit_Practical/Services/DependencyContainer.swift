@@ -102,39 +102,78 @@ struct PolynomialListViewModel {
 
     /// Process an image through the complete OCR pipeline
     func processImage(_ image: UIImage) async throws -> [Polynomial] {
+        print("📸 [DEBUG] ViewModel.processImage starting")
+        print("  Image size: \(image.size.width) x \(image.size.height)")
+
         // Step 1: Run OCR
+        print("🔍 [DEBUG] Step 1: Running OCR...")
         let ocrResults = try await ocrService.processImage(image)
+        print("✅ [DEBUG] OCR found \(ocrResults.count) text regions")
+
+        for (index, result) in ocrResults.enumerated() {
+            let confidencePercent = String(format: "%.1f%%", result.confidence * 100)
+            print("  - [\(index)] '\(result.text)' (confidence: \(confidencePercent))")
+        }
 
         // Step 2: Filter to polynomial expressions
+        print("🔍 [DEBUG] Step 2: Filtering polynomials from \(ocrResults.count) OCR results...")
         let polynomialStrings = filterService.filterPolynomials(from: ocrResults)
+        print("✅ [DEBUG] Filtered to \(polynomialStrings.count) potential polynomial expressions")
+
+        for (index, expr) in polynomialStrings.enumerated() {
+            print("  - [\(index)] '\(expr)'")
+        }
 
         guard !polynomialStrings.isEmpty else {
+            print("⚠️ [DEBUG] No polynomials found after filtering - returning empty array")
             return []
         }
 
         // Step 3: Save image
+        print("💾 [DEBUG] Step 3: Saving image to file system...")
         let imagePath = imageManager.saveImage(image)
+        print("✅ [DEBUG] Image saved to: \(imagePath ?? "nil (save failed)")")
 
         // Step 4: Parse each expression
+        print("🧮 [DEBUG] Step 4: Parsing \(polynomialStrings.count) polynomial expressions...")
         var results: [Polynomial] = []
 
-        for expression in polynomialStrings {
-            let mathResult = try await parserService.parse(expression)
+        for (index, expression) in polynomialStrings.enumerated() {
+            do {
+                print("  - [\(index)] Parsing '\(expression)'...")
+                let mathResult = try await parserService.parse(expression)
 
-            let polynomial = Polynomial(
-                originalExpression: mathResult.original,
-                simplifiedExpression: mathResult.simplified,
-                derivative: mathResult.derivative,
-                valueAt1: mathResult.valueAt1,
-                valueAt2: mathResult.valueAt2,
-                imagePath: imagePath
-            )
+                print("    ✓ Original: \(mathResult.original)")
+                print("    ✓ Simplified: \(mathResult.simplified ?? "N/A")")
+                print("    ✓ Derivative: \(mathResult.derivative ?? "N/A")")
+                print("    ✓ f(1): \(mathResult.valueAt1?.description ?? "N/A")")
+                print("    ✓ f(2): \(mathResult.valueAt2?.description ?? "N/A")")
 
-            // Step 5: Save to repository
-            try await repository.save(polynomial)
-            results.append(polynomial)
+                if let error = mathResult.error {
+                    print("    ⚠️ Error: \(error.localizedDescription)")
+                }
+
+                let polynomial = Polynomial(
+                    id: UUID(),
+                    originalExpression: mathResult.original,
+                    simplifiedExpression: mathResult.simplified,
+                    derivative: mathResult.derivative,
+                    valueAt1: mathResult.valueAt1,
+                    valueAt2: mathResult.valueAt2,
+                    imagePath: imagePath
+                )
+
+                // Step 5: Save to repository
+                print("    💾 Saving to Core Data...")
+                try await repository.save(polynomial)
+                results.append(polynomial)
+                print("    ✅ Polynomial saved successfully (ID: \(polynomial.id))")
+            } catch {
+                print("    ❌ Parse failed for '\(expression)': \(error.localizedDescription)")
+            }
         }
 
+        print("✅ [DEBUG] ViewModel.processImage completed with \(results.count) polynomials saved")
         return results
     }
 

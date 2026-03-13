@@ -65,6 +65,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     // MARK: - Core Data Stack
 
     lazy var persistentContainer: NSPersistentContainer = {
+        // Model name must match the .xcdatamodeld directory name exactly
         let container = NSPersistentContainer(name: "OCRDetection_Arpit_Practical")
         container.loadPersistentStores(completionHandler: { (storeDescription, error) in
             if let error = error as NSError? {
