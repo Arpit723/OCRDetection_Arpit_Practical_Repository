@@ -22,6 +22,35 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // Setup window programmatically (no SceneDelegate)
         setupWindow()
 
+        // Test Core Data initialization
+        print("🧪 Testing Core Data initialization...")
+        let container = persistentContainer
+
+        // Verify store loaded
+        print("   Store coordinator: \(container.persistentStoreCoordinator)")
+        print("   Persistent stores: \(container.persistentStoreCoordinator.persistentStores)")
+        print("   Managed object model: \(container.managedObjectModel)")
+
+        // Test fetch request
+        let context = container.viewContext
+        let request = NSFetchRequest<NSFetchRequestResult>(entityName: "PolynomialEntity")
+        do {
+            let count = try context.count(for: request)
+            print("   ✅ Core Data working! Found \(count) existing polynomials")
+        } catch {
+            print("   ❌ Core Data fetch failed: \(error)")
+        }
+
+        // Setup notification-based context merge for background saves
+        NotificationCenter.default.addObserver(
+            forName: .NSManagedObjectContextDidSave,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let context = self?.persistentContainer.viewContext else { return }
+            context.mergeChanges(fromContextDidSave: notification)
+        }
+
         return true
     }
 
@@ -69,9 +98,17 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         let container = NSPersistentContainer(name: "OCRDetection_Arpit_Practical")
         container.loadPersistentStores(completionHandler: { (storeDescription, error) in
             if let error = error as NSError? {
+                print("❌ Core Data store loading failed: \(error)")
+                print("   Store URL: \(storeDescription.url?.path ?? "unknown")")
+                print("   Store type: \(storeDescription.type)")
                 fatalError("Unresolved Core Data error: \(error), \(error.userInfo)")
             }
         })
+
+        // Enable automatic merge policy for better concurrency
+        container.viewContext.automaticallyMergesChangesFromParent = true
+        container.viewContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
+
         return container
     }()
 

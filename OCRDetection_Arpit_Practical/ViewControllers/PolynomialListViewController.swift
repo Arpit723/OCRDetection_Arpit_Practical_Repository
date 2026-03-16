@@ -10,6 +10,7 @@ import PhotosUI
 
 /// Main view controller that displays a list of detected polynomials.
 /// Manages OCR pipeline, image import, and collection view display.
+@MainActor
 class PolynomialListViewController: UIViewController {
 
     // MARK: - IBOutlets

@@ -64,16 +64,16 @@ final class PolynomialRepositoryImpl: PolynomialRepository {
                     backgroundContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
                     backgroundContext.undoManager = nil
 
-                    // Check if entity already exists
+                    // Check if entity exists - use proper error handling
                     print("  🔍 [DEBUG] Repository: Checking for existing entity with id: \(polynomial.id)")
                     let request = NSFetchRequest<PolynomialEntity>(entityName: "PolynomialEntity")
                     request.predicate = NSPredicate(format: "id == %@", polynomial.id as CVarArg)
                     request.fetchLimit = 1
 
-                    let existingEntities = try? backgroundContext.fetch(request)
-                    let entity = existingEntities?.first ?? PolynomialEntity(context: backgroundContext)
+                    let existingEntities = try backgroundContext.fetch(request)
+                    let entity = existingEntities.first ?? PolynomialEntity(context: backgroundContext)
 
-                    if existingEntities?.first != nil {
+                    if existingEntities.first != nil {
                         print("  🔄 [DEBUG] Repository: Updating existing entity")
                     } else {
                         print("  ➕ [DEBUG] Repository: Creating new entity")
