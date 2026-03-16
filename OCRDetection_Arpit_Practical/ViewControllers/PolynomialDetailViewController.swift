@@ -15,9 +15,13 @@ class PolynomialDetailViewController: UIViewController {
 
     @IBOutlet private weak var scrollView: UIScrollView!
     @IBOutlet private weak var originalLabel: UILabel!
+    @IBOutlet private weak var simplifiedTitleLabel: UILabel!
     @IBOutlet private weak var simplifiedLabel: UILabel!
+    @IBOutlet private weak var derivativeTitleLabel: UILabel!
     @IBOutlet private weak var derivativeLabel: UILabel!
+    @IBOutlet private weak var valueAt1TitleLabel: UILabel!
     @IBOutlet private weak var valueAt1Label: UILabel!
+    @IBOutlet private weak var valueAt2TitleLabel: UILabel!
     @IBOutlet private weak var valueAt2Label: UILabel!
     @IBOutlet private weak var imageView: UIImageView!
 
@@ -56,6 +60,24 @@ class PolynomialDetailViewController: UIViewController {
         originalLabel.font = .preferredFont(forTextStyle: .headline)
         originalLabel.numberOfLines = 0
 
+        // Title labels
+        simplifiedTitleLabel.font = .preferredFont(forTextStyle: .subheadline)
+        simplifiedTitleLabel.textColor = .secondaryLabel
+        simplifiedTitleLabel.text = "Simplified Version:"
+
+        derivativeTitleLabel.font = .preferredFont(forTextStyle: .subheadline)
+        derivativeTitleLabel.textColor = .secondaryLabel
+        derivativeTitleLabel.text = "Derivative:"
+
+        valueAt1TitleLabel.font = .preferredFont(forTextStyle: .subheadline)
+        valueAt1TitleLabel.textColor = .secondaryLabel
+        valueAt1TitleLabel.text = "Value at x = 1:"
+
+        valueAt2TitleLabel.font = .preferredFont(forTextStyle: .subheadline)
+        valueAt2TitleLabel.textColor = .secondaryLabel
+        valueAt2TitleLabel.text = "Value at x = 2:"
+
+        // Value labels
         simplifiedLabel.font = .preferredFont(forTextStyle: .title3)
         simplifiedLabel.numberOfLines = 0
         simplifiedLabel.textColor = .label
@@ -114,15 +136,15 @@ class PolynomialDetailViewController: UIViewController {
 
         // Format values
         if let valueAt1 = polynomial.valueAt1 {
-            valueAt1Label.text = "f(1) = \(formatValue(valueAt1))"
+            valueAt1Label.text = formatValue(valueAt1)
         } else {
-            valueAt1Label.text = "f(1) = N/A"
+            valueAt1Label.text = "N/A"
         }
 
         if let valueAt2 = polynomial.valueAt2 {
-            valueAt2Label.text = "f(2) = \(formatValue(valueAt2))"
+            valueAt2Label.text = formatValue(valueAt2)
         } else {
-            valueAt2Label.text = "f(2) = N/A"
+            valueAt2Label.text = "N/A"
         }
 
         // Load image

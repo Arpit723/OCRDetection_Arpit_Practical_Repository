@@ -168,7 +168,7 @@ final class PolynomialRepositoryImpl: PolynomialRepository {
 
     private func toDomain(_ entity: PolynomialEntity) -> Polynomial {
         Polynomial(
-            id: entity.id!,
+            id: entity.id ?? UUID(),
             originalExpression: entity.originalExpression!,
             simplifiedExpression: entity.simplifiedExpression,
             derivative: entity.derivative,
