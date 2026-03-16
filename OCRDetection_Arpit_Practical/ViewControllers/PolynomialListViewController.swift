@@ -75,12 +75,6 @@ class PolynomialListViewController: UIViewController {
         collectionView.dataSource = self
         collectionView.delegate = self
 
-        // Register cell class (in case storyboard registration fails)
-        collectionView.register(
-            PolynomialCollectionViewCell.self,
-            forCellWithReuseIdentifier: "PolynomialCell"
-        )
-
         // Setup preview image view
         previewImageView.layer.cornerRadius = 12
         previewImageView.layer.borderWidth = 1

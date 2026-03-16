@@ -65,7 +65,14 @@ struct PolynomialMathResult: Equatable {
 
     /// Initialize with an error state
     init(original: String, error: MathError) {
-        self.init(original: original, error: error)
+        self.init(
+            original: original,
+            simplified: nil,
+            derivative: nil,
+            valueAt1: nil,
+            valueAt2: nil,
+            error: error
+        )
     }
 
     // MARK: - Computed Properties

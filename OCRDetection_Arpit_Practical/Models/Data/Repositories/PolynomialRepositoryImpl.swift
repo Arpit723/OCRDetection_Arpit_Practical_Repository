@@ -70,10 +70,10 @@ final class PolynomialRepositoryImpl: PolynomialRepository {
                     request.predicate = NSPredicate(format: "id == %@", polynomial.id as CVarArg)
                     request.fetchLimit = 1
 
-                    let existingEntities = try? backgroundContext.fetch(request)
-                    let entity = existingEntities?.first ?? PolynomialEntity(context: backgroundContext)
+                    let existingEntities = try backgroundContext.fetch(request)
+                    let entity = existingEntities.first ?? PolynomialEntity(context: backgroundContext)
 
-                    if existingEntities?.first != nil {
+                    if existingEntities.first != nil {
                         print("  🔄 [DEBUG] Repository: Updating existing entity")
                     } else {
                         print("  ➕ [DEBUG] Repository: Creating new entity")
@@ -85,8 +85,8 @@ final class PolynomialRepositoryImpl: PolynomialRepository {
                     entity.originalExpression = polynomial.originalExpression
                     entity.simplifiedExpression = polynomial.simplifiedExpression
                     entity.derivative = polynomial.derivative
-                    entity.valueAt1Optional = polynomial.valueAt1
-                    entity.valueAt2Optional = polynomial.valueAt2
+                    entity.valueAt1 = polynomial.valueAt1.map { NSDecimalNumber(value: $0) }
+                    entity.valueAt2 = polynomial.valueAt2.map { NSDecimalNumber(value: $0) }
                     entity.imagePath = polynomial.imagePath
                     entity.createdAt = polynomial.createdAt
 
@@ -168,14 +168,14 @@ final class PolynomialRepositoryImpl: PolynomialRepository {
 
     private func toDomain(_ entity: PolynomialEntity) -> Polynomial {
         Polynomial(
-            id: entity.id,
-            originalExpression: entity.originalExpression,
+            id: entity.id!,
+            originalExpression: entity.originalExpression!,
             simplifiedExpression: entity.simplifiedExpression,
             derivative: entity.derivative,
-            valueAt1: entity.valueAt1Optional,
-            valueAt2: entity.valueAt2Optional,
+            valueAt1: entity.valueAt1?.doubleValue,
+            valueAt2: entity.valueAt2?.doubleValue,
             imagePath: entity.imagePath,
-            createdAt: entity.createdAt
+            createdAt: entity.createdAt ?? Date()
         )
     }
 }
